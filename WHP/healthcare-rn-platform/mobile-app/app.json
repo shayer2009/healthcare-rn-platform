@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "Healthcare UI",
+    "slug": "healthcare-ui",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "assetBundlePatterns": ["**/*"],
+    "android": {
+      "package": "com.example.healthcareui"
+    }
+  }
+}

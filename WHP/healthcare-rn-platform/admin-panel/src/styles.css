@@ -1,0 +1,239 @@
+* {
+  box-sizing: border-box;
+  font-family: Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #f4f5f8;
+  color: #262626;
+}
+
+.centered {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.userName {
+  font-weight: 600;
+  color: #5b3ba8;
+}
+
+.logoutBtn {
+  background: #6b7280;
+  border-color: #6b7280;
+}
+
+.roleTabs {
+  display: flex;
+  gap: 8px;
+}
+
+.roleTab {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #cfcfcf;
+  background: #f9f9f9;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.roleTab.active {
+  background: #5b3ba8;
+  border-color: #5b3ba8;
+  color: white;
+}
+
+.profileCard {
+  margin-bottom: 16px;
+}
+
+.profileCard p {
+  margin: 6px 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid #e7e7e7;
+}
+
+.login {
+  width: min(360px, 90vw);
+  display: grid;
+  gap: 10px;
+}
+
+input,
+button {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #cfcfcf;
+}
+
+button {
+  cursor: pointer;
+  background: #5b3ba8;
+  border-color: #5b3ba8;
+  color: white;
+}
+
+.message {
+  color: #5b3ba8;
+}
+
+.settings {
+  display: grid;
+  gap: 8px;
+}
+
+.settingRow {
+  display: flex;
+  justify-content: space-between;
+  text-transform: capitalize;
+}
+
+.settingRow.highlight {
+  padding: 12px;
+  background: #f0eef5;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.sectionDesc {
+  color: #666;
+  margin-bottom: 16px;
+}
+
+.dataList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.dataList li {
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.orgList {
+  margin-top: 16px;
+}
+
+.orgItem {
+  padding: 8px 12px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.whpSummary {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #f0eef5;
+  border-radius: 8px;
+}
+
+.whpCard {
+  border-left: 4px solid #5b3ba8;
+}
+
+/* Admin layout with sidebar */
+.adminLayout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 240px;
+  background: #2d2a36;
+  color: #fff;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebarTitle {
+  font-size: 18px;
+  margin: 0 0 20px 0;
+}
+
+.sidebarNav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.sidebarLink {
+  text-align: left;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #b8b4c4;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.sidebarLink:hover {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+}
+
+.sidebarLink.active {
+  background: #5b3ba8;
+  color: #fff;
+}
+
+.sidebarFooter {
+  padding-top: 16px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.sidebarFooter .userName {
+  color: #b8b4c4;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.mainContent {
+  flex: 1;
+  padding: 24px;
+  background: #f4f5f8;
+  overflow-y: auto;
+}
