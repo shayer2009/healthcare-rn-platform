@@ -4,6 +4,27 @@ import logger from "../utils/logger.js";
 import { asyncHandler } from "../utils/errorHandler.js";
 
 export function registerHealthRoutes(app) {
+  // Root - welcome and links
+  app.get("/", (req, res) => {
+    res.type("html").send(`
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>World Health Portal API</title></head>
+<body style="font-family:system-ui;max-width:600px;margin:2rem auto;padding:0 1rem;">
+  <h1>World Health Portal API</h1>
+  <p>The API is running. Useful links:</p>
+  <ul>
+    <li><a href="/health">/health</a> — Health check</li>
+    <li><a href="/ready">/ready</a> — Readiness (database)</li>
+    <li><a href="/api-docs">/api-docs</a> — Swagger API documentation</li>
+    <li><a href="/api/admin/login">POST /api/admin/login</a> — Admin login</li>
+  </ul>
+  <p><small>World Health Portal Backend</small></p>
+</body>
+</html>
+    `);
+  });
+
   // Health check - basic server status
   app.get("/health", asyncHandler(async (req, res) => {
     res.json({
