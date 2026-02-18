@@ -7,13 +7,19 @@ name: world-health-portal
 region: nyc1
 
 # Backend API (Node.js)
+# Config A: Repo root = backend (package.json + src/ at root). No source_dir.
+# Config B: Monorepo with backend in subfolder. Uncomment source_dir below and use:
+#   source_dir: backend
+#   build_command: cd backend && npm ci
+#   run_command: cd backend && node src/server.js
 services:
   - name: backend
     github:
       repo: shayer2009/healthcare-rn-platform
       branch: main
       deploy_on_push: true
-    source_dir: backend
+    # source_dir: backend   # Uncomment for monorepo (backend in subfolder)
+    build_command: npm ci
     run_command: node src/server.js
     environment_slug: node-js
     http_port: 8080
