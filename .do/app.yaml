@@ -7,19 +7,15 @@ name: world-health-portal
 region: nyc1
 
 # Backend API (Node.js)
-# Config A: Repo root = backend (package.json + src/ at root). No source_dir.
-# Config B: Monorepo with backend in subfolder. Uncomment source_dir below and use:
-#   source_dir: backend
-#   build_command: cd backend && npm ci
-#   run_command: cd backend && node src/server.js
+# Monorepo configuration - backend is in subfolder
 services:
   - name: backend
     github:
       repo: shayer2009/healthcare-rn-platform
       branch: main
       deploy_on_push: true
-    # source_dir: backend   # Uncomment for monorepo (backend in subfolder)
-    build_command: npm ci
+    source_dir: backend
+    build_command: npm install --omit=dev
     run_command: node src/server.js
     environment_slug: node-js
     http_port: 8080
@@ -42,15 +38,21 @@ services:
       success_threshold: 1
       failure_threshold: 3
 
-# Admin panel (optional static site - uncomment and set repo)
-# static_sites:
-#   - name: admin-panel
-#     github:
-#       repo: shayer2009/healthcare-rn-platform
-#       branch: main
-#     source_dir: admin-panel
-#     build_command: npm ci && npm run build
-#     output_dir: dist
-#     environment_slug: node-js
-#     routes:
-#       - path: /
+# Admin panel (static site)
+static_sites:
+  - name: admin-panel
+    github:
+      repo: shayer2009/healthcare-rn-platform
+      branch: main
+      deploy_on_push: true
+    source_dir: admin-panel
+    build_command: npm install && npm run build
+    output_dir: dist
+    environment_slug: node-js
+    routes:
+      - path: /
+    envs:
+      # Set to your backend URL after first deploy (e.g. https://backend-xxxx.ondigitalocean.app)
+      - key: VITE_API_URL
+        value: ""
+        type: GENERAL

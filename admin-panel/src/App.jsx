@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 
-const API_URL = "http://localhost:4000";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
 const FEATURE_SECTIONS = [
   { id: "overview", label: "Overview" },
