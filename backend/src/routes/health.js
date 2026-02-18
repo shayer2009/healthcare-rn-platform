@@ -86,4 +86,33 @@ export function registerHealthRoutes(app) {
       res.status(500).json({ error: "Failed to collect metrics" });
     }
   }));
+
+  // Database connection diagnostic
+  app.get("/api/db-test", asyncHandler(async (req, res) => {
+    const dbConfig = {
+      host: process.env.DB_HOST ? "***" : "not set",
+      port: process.env.DB_PORT || "not set",
+      user: process.env.DB_USER ? "***" : "not set",
+      database: process.env.DB_NAME || "not set",
+      ssl: process.env.DB_SSL === "true" || (process.env.NODE_ENV === "production" && Number(process.env.DB_PORT) === 25060) ? "enabled" : "disabled"
+    };
+    
+    try {
+      await query("SELECT 1 as test");
+      res.json({
+        status: "connected",
+        config: dbConfig,
+        message: "Database connection successful"
+      });
+    } catch (error) {
+      res.status(503).json({
+        status: "disconnected",
+        config: dbConfig,
+        error: error.message,
+        code: error.code,
+        sqlState: error.sqlState,
+        hint: "Check DB credentials, SSL settings (DB_SSL=true for DO managed DB), and database Trusted Sources"
+      });
+    }
+  }));
 }
