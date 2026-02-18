@@ -1,10 +1,10 @@
-import { createPool } from "mariadb";
+import mysql from "mysql2/promise";
 import dotenv from "dotenv";
 import logger from "./utils/logger.js";
 
 dotenv.config();
 
-// SSL configuration for DigitalOcean managed databases
+// SSL configuration for DigitalOcean managed databases (MySQL)
 const dbPort = Number(process.env.DB_PORT || 3307);
 const isProduction = process.env.NODE_ENV === "production";
 const isManagedDB = process.env.DB_HOST && (
@@ -20,13 +20,11 @@ const poolConfig = {
   password: process.env.DB_PASSWORD || "health_pass",
   database: process.env.DB_NAME || "healthcare_app",
   connectionLimit: Number(process.env.DB_CONNECTION_LIMIT || 10),
-  acquireTimeout: 60000,
-  timeout: 60000
+  connectTimeout: 60000,
+  queueLimit: 0
 };
 
-// Enable SSL for DigitalOcean managed databases (required)
-// Port 25060 is always DO managed DB and requires SSL
-// Can also force SSL via DB_SSL=true env var
+// Enable SSL for DigitalOcean managed databases (required for port 25060)
 if (process.env.DB_SSL === "true" || dbPort === 25060 || (isProduction && isManagedDB)) {
   poolConfig.ssl = {
     rejectUnauthorized: false // DO uses self-signed certificates
@@ -34,28 +32,20 @@ if (process.env.DB_SSL === "true" || dbPort === 25060 || (isProduction && isMana
   logger.info("Database SSL enabled", { host: poolConfig.host, port: poolConfig.port });
 }
 
-export const pool = createPool(poolConfig);
-
-// Log connection events
-pool.on("connection", (conn) => {
-  logger.debug("New database connection", { threadId: conn.threadId });
-});
-
-pool.on("error", (err) => {
-  logger.error("Database pool error", { error: err.message });
-});
+export const pool = mysql.createPool(poolConfig);
 
 export async function query(sql, params = []) {
   let conn;
   try {
     conn = await pool.getConnection();
-    return await conn.query(sql, params);
+    const [result] = await conn.query(sql, params);
+    return result;
   } catch (error) {
     logger.error("Database query failed", {
       error: error.message,
       code: error.code,
       sqlState: error.sqlState,
-      sql: sql.substring(0, 100) // Log first 100 chars of SQL for debugging
+      sql: sql.substring(0, 100)
     });
     throw error;
   } finally {

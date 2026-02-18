@@ -20,11 +20,15 @@ This means the database connection pool cannot establish connections to your Dig
 
 ## Fix Applied
 
-✅ **Updated `backend/src/db.js`:**
+✅ **Switched to `mysql2` driver (DigitalOcean MySQL compatibility):**
+- Replaced `mariadb` with `mysql2` in `backend/package.json`
+- **`backend/src/db.js`** now uses `mysql2/promise` with the same SSL logic (port 25060 or `DB_SSL=true` → `ssl: { rejectUnauthorized: false }`)
+- **`backend/src/utils/transactions.js`** and **`backend/src/migrations/knexfile.js`** updated to use mysql2
+
+✅ **SSL and detection (unchanged):**
 - Automatically detects DigitalOcean managed databases (port 25060 or host contains "ondigitalocean.com")
 - Enables SSL with `rejectUnauthorized: false` (DO uses self-signed certs)
-- Added `DB_SSL=true` env var option to force SSL if needed
-- Improved error logging for connection failures
+- `DB_SSL=true` env var option to force SSL if needed
 
 ## What You Need to Do
 
