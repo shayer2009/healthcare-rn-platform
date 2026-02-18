@@ -30,6 +30,9 @@ This means the database connection pool cannot establish connections to your Dig
 - Enables SSL with `rejectUnauthorized: false` (DO uses self-signed certs)
 - `DB_SSL=true` env var option to force SSL if needed
 
+✅ **Whitespace trimming:**
+- All DB environment variables (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`) are automatically trimmed to prevent DNS lookup failures from trailing spaces/tabs
+
 ## What You Need to Do
 
 ### Option 1: Redeploy (Recommended)
@@ -85,6 +88,30 @@ Returns:
 - Error details if connection fails
 - SSL status
 
+## "Application could not be loaded" / Page won't serve
+
+If you see **"We encountered an error when trying to load your application and your page could not be served"** (including when opening `/api/db-test`), the **app is crashing on startup** before it can serve any route. The DB-test page can't load because the process never starts.
+
+### What to do
+
+1. **Check the app logs** (this will show the real error):
+   - DigitalOcean dashboard → your app → **Runtime Logs** (or **Logs**)
+   - Look for the line right after the app starts; you should see either:
+     - `Startup failed: Cannot find module 'mysql2/promise'` → build didn’t install `mysql2` (see below), or
+     - Another error (e.g. DB connection, missing env) → fix that first.
+
+2. **If the log says "Cannot find module 'mysql2/promise'":**
+   - Confirm `backend/package.json` has `"mysql2": "^3.11.0"` in `dependencies`.
+   - Commit and push, then **Redeploy** the app.
+   - In App Platform → your component → **Settings** → consider **Clear build cache** and redeploy so `npm install` runs with the new `package.json`.
+
+3. **Use the correct URL:** the diagnostic route is **`/api/db-test`** (with a hyphen), not `api/dbitest`.
+
+4. After the app starts successfully, test again:  
+   `https://world-health-portal-gpeip.ondigitalocean.app/api/db-test`
+
+---
+
 ## Common Issues
 
 ### Still Getting Connection Errors?
@@ -97,6 +124,22 @@ Returns:
 ### Port 25060 Not Detected?
 
 If your DB port is 25060 but SSL still shows "disabled", add `DB_SSL=true` env var explicitly.
+
+### Error: `getaddrinfo ENOTFOUND ...` (DNS lookup failed)
+
+If you see **`ENOTFOUND`** errors like:
+```
+getaddrinfo ENOTFOUND world-health-portal-db-do-user-20344621-0.l.db.ondigitalocean.com\t
+```
+
+**Cause:** The `DB_HOST` environment variable has **trailing whitespace** (tab, space, or newline). This is common when copying connection strings from the DigitalOcean dashboard.
+
+**Fix:**
+1. Go to App Platform → your backend component → **Settings** → **App-Level Environment Variables**
+2. Find `DB_HOST` and **edit it** - remove any trailing spaces/tabs/newlines
+3. **Save** and **Redeploy**
+
+**Note:** The code now automatically trims whitespace from all DB env vars (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`), so this should be fixed after redeploy. But it's still good practice to clean up env vars manually.
 
 ## Next Steps
 

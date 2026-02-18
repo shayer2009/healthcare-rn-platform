@@ -5,21 +5,27 @@ import logger from "./utils/logger.js";
 dotenv.config();
 
 // SSL configuration for DigitalOcean managed databases (MySQL)
-const dbPort = Number(process.env.DB_PORT || 3307);
+// Trim whitespace from env vars (common issue when copying from DO dashboard)
+const dbHost = (process.env.DB_HOST || "127.0.0.1").trim();
+const dbPort = Number((process.env.DB_PORT || "3307").trim());
+const dbUser = (process.env.DB_USER || "health_user").trim();
+const dbPassword = (process.env.DB_PASSWORD || "health_pass").trim();
+const dbName = (process.env.DB_NAME || "healthcare_app").trim();
+
 const isProduction = process.env.NODE_ENV === "production";
-const isManagedDB = process.env.DB_HOST && (
-  process.env.DB_HOST.includes("ondigitalocean.com") ||
-  process.env.DB_HOST.includes("db.ondigitalocean.com") ||
+const isManagedDB = dbHost && (
+  dbHost.includes("ondigitalocean.com") ||
+  dbHost.includes("db.ondigitalocean.com") ||
   dbPort === 25060 // DO managed DB default port
 );
 
 const poolConfig = {
-  host: process.env.DB_HOST || "127.0.0.1",
+  host: dbHost,
   port: dbPort,
-  user: process.env.DB_USER || "health_user",
-  password: process.env.DB_PASSWORD || "health_pass",
-  database: process.env.DB_NAME || "healthcare_app",
-  connectionLimit: Number(process.env.DB_CONNECTION_LIMIT || 10),
+  user: dbUser,
+  password: dbPassword,
+  database: dbName,
+  connectionLimit: Number((process.env.DB_CONNECTION_LIMIT || "10").trim()),
   connectTimeout: 60000,
   queueLimit: 0
 };
@@ -45,8 +51,17 @@ export async function query(sql, params = []) {
       error: error.message,
       code: error.code,
       sqlState: error.sqlState,
-      sql: sql.substring(0, 100)
+      sql: sql.substring(0, 100),
+      host: poolConfig.host // Log host for debugging DNS issues
     });
+    // Log helpful hints for common errors
+    if (error.code === "ENOTFOUND") {
+      logger.error("DNS lookup failed - check DB_HOST env var (may have trailing whitespace)", {
+        host: poolConfig.host,
+        hostLength: poolConfig.host.length,
+        hostJSON: JSON.stringify(poolConfig.host) // Shows hidden chars
+      });
+    }
     throw error;
   } finally {
     if (conn) conn.release();

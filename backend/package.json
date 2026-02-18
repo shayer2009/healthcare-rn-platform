@@ -7,7 +7,7 @@
   "scripts": {
     "build": "echo No build step",
     "dev": "node --watch src/server.js",
-    "start": "node src/server.js",
+    "start": "node src/start.js",
     "test": "NODE_ENV=test jest --coverage",
     "test:watch": "NODE_ENV=test jest --watch",
     "test:integration": "NODE_ENV=test jest --testPathPattern=integration",
