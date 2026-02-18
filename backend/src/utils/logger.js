@@ -1,8 +1,9 @@
-/** Structured Logging with Winston */
+/** Structured Logging with Winston - safe for read-only/container envs (e.g. App Platform) */
 import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
 import path from "path";
 import { fileURLToPath } from "url";
+import { existsSync, mkdirSync } from "fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,38 +26,40 @@ const consoleFormat = winston.format.combine(
   })
 );
 
+const transports = [
+  new winston.transports.Console({ format: consoleFormat })
+];
+
+// Add file transports only when writable (skip in production/containers to avoid read-only FS crashes)
+if (process.env.LOG_TO_FILES === "true") {
+  try {
+    const logsDir = path.join(__dirname, "../../logs");
+    if (!existsSync(logsDir)) mkdirSync(logsDir, { recursive: true });
+    transports.push(
+      new DailyRotateFile({
+        filename: path.join(logsDir, "error-%DATE%.log"),
+        datePattern: "YYYY-MM-DD",
+        level: "error",
+        maxSize: "20m",
+        maxFiles: "14d"
+      }),
+      new DailyRotateFile({
+        filename: path.join(logsDir, "combined-%DATE%.log"),
+        datePattern: "YYYY-MM-DD",
+        maxSize: "20m",
+        maxFiles: "30d"
+      })
+    );
+  } catch (_) {
+    // Use console only if filesystem not writable (e.g. App Platform)
+  }
+}
+
 const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || "info",
   format: logFormat,
   defaultMeta: { service: "world-health-portal" },
-  transports: [
-    // Console transport
-    new winston.transports.Console({
-      format: consoleFormat
-    }),
-    // Daily rotate file for errors
-    new DailyRotateFile({
-      filename: path.join(__dirname, "../../logs/error-%DATE%.log"),
-      datePattern: "YYYY-MM-DD",
-      level: "error",
-      maxSize: "20m",
-      maxFiles: "14d"
-    }),
-    // Daily rotate file for all logs
-    new DailyRotateFile({
-      filename: path.join(__dirname, "../../logs/combined-%DATE%.log"),
-      datePattern: "YYYY-MM-DD",
-      maxSize: "20m",
-      maxFiles: "30d"
-    })
-  ]
+  transports
 });
-
-// Create logs directory if it doesn't exist
-import { existsSync, mkdirSync } from "fs";
-const logsDir = path.join(__dirname, "../../logs");
-if (!existsSync(logsDir)) {
-  mkdirSync(logsDir, { recursive: true });
-}
 
 export default logger;

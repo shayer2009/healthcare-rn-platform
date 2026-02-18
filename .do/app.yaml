@@ -36,11 +36,11 @@ services:
       # DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, JWT_SECRET
     health_check:
       http_path: /health
-      initial_delay_seconds: 10
-      period_seconds: 10
-      timeout_seconds: 3
+      initial_delay_seconds: 30
+      period_seconds: 15
+      timeout_seconds: 5
       success_threshold: 1
-      failure_threshold: 3
+      failure_threshold: 5
 
 # Admin panel (static site)
 static_sites:

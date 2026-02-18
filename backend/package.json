@@ -34,7 +34,6 @@
     "express-validator": "^7.0.1",
     "crypto": "^1.0.1",
     "fhir-kit-client": "^1.2.0",
-    "node-fhir-server-core": "^2.6.0",
     "kafkajs": "^2.2.4",
     "axios": "^1.6.7",
     "joi": "^17.11.0",

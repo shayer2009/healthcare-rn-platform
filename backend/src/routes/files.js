@@ -11,17 +11,29 @@ import { asyncHandler, AppError } from "../utils/errorHandler.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const uploadsDir = join(__dirname, "../../uploads");
-if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => {
-    const name = file.originalname && String(file.originalname).trim();
-    const ext = (name && name.includes(".") ? name.split(".").pop() : null) || "bin";
-    cb(null, `${uuidv4()}.${ext}`);
+let uploadsDir;
+try {
+  uploadsDir = join(__dirname, "../../uploads");
+  if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
+} catch (_) {
+  uploadsDir = join(process.cwd(), "uploads");
+  try {
+    if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
+  } catch (_) {
+    uploadsDir = null; // will use memoryStorage
   }
-});
+}
+
+const storage = uploadsDir
+  ? multer.diskStorage({
+      destination: (req, file, cb) => cb(null, uploadsDir),
+      filename: (req, file, cb) => {
+        const name = file.originalname && String(file.originalname).trim();
+        const ext = (name && name.includes(".") ? name.split(".").pop() : null) || "bin";
+        cb(null, `${uuidv4()}.${ext}`);
+      }
+    })
+  : multer.memoryStorage();
 
 const upload = multer({
   storage,
@@ -45,13 +57,14 @@ export function registerFileRoutes(app, { authMiddleware }) {
       return res.status(400).json({ message: "entity_type and entity_id required" });
     }
 
+    const filePath = req.file.filename ? `/uploads/${req.file.filename}` : `memory:${uuidv4()}`;
     const result = await query(
       "INSERT INTO file_attachments (entity_type, entity_id, file_name, file_path, file_size, mime_type, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
       [
         entity_type,
         entity_id,
-        req.file.originalname,
-        `/uploads/${req.file.filename}`,
+        req.file.originalname || "upload",
+        filePath,
         req.file.size,
         req.file.mimetype,
         req.user.sub
@@ -64,8 +77,8 @@ export function registerFileRoutes(app, { authMiddleware }) {
 
     res.status(201).json({
       id: result.insertId,
-      file_name: req.file.originalname,
-      file_path: `/uploads/${req.file.filename}`,
+      file_name: req.file.originalname || "upload",
+      file_path,
       file_size: req.file.size
     });
   }));
@@ -80,14 +93,16 @@ export function registerFileRoutes(app, { authMiddleware }) {
     res.json({ files });
   }));
 
-  // Serve uploaded files (basename prevents path traversal)
-  app.get("/uploads/:filename", asyncHandler(async (req, res) => {
-    const filename = basename(req.params.filename);
-    if (!filename) return res.status(400).json({ message: "Invalid filename" });
-    const filePath = join(uploadsDir, filename);
-    if (!existsSync(filePath)) {
-      return res.status(404).json({ message: "File not found" });
-    }
-    res.sendFile(filePath);
-  }));
+  // Serve uploaded files (only when disk storage is available)
+  if (uploadsDir) {
+    app.get("/uploads/:filename", asyncHandler(async (req, res) => {
+      const filename = basename(req.params.filename);
+      if (!filename) return res.status(400).json({ message: "Invalid filename" });
+      const filePath = join(uploadsDir, filename);
+      if (!existsSync(filePath)) {
+        return res.status(404).json({ message: "File not found" });
+      }
+      res.sendFile(filePath);
+    }));
+  }
 }
