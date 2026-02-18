@@ -6,15 +6,16 @@ Common reasons DigitalOcean deployment fails and how to fix them.
 
 ## 1. Build fails: "npm ci" / "package-lock.json not found"
 
-**Symptom:** Build log shows error like `npm ERR! `npm ci` can only install packages when your package.json and package-lock.json are in sync` or missing lock file.
+**Symptom:** Build log shows error like `npm ERR! \`npm ci\` can only install packages when your package.json and package-lock.json are in sync` or missing lock file.
 
-**Cause:** The spec used `npm ci`, which requires a `package-lock.json` in the repo. This repo uses `npm install` in the build step so a lock file is not required.
+**Cause:** DigitalOcean's Node buildpack runs `npm ci` by default, which requires a `package-lock.json`. Without it, the install step fails before your build command runs.
 
-**Fix applied:** `.do/app.yaml` was updated to use:
-- Backend: `build_command: npm install --omit=dev`
-- Admin panel: `build_command: npm install && npm run build`
+**Fix applied:**
+- **USE_NPM_INSTALL:** In `.do/app.yaml`, both backend and admin-panel have env var `USE_NPM_INSTALL` with `scope: BUILD_TIME` and value `"true"`. This makes the buildpack use `npm install` instead of `npm ci`, so no lock file is required.
+- **Backend build script:** Backend `package.json` has `"build": "echo No build step"` so the default `npm run build` step does not fail.
+- **Build commands:** Both components use `build_command: npm run build` (backend runs the no-op script; admin runs Vite build).
 
-**If you still see npm ci:** In DigitalOcean dashboard, edit the component → Build & Run → **Build Command** and set it explicitly to the commands above (do not leave blank so DO doesn’t auto-run `npm ci`).
+**Optional:** To use `npm ci` (faster, reproducible), run `npm install` in `backend/` and `admin-panel/` locally, commit the generated `package-lock.json` files, and you can remove `USE_NPM_INSTALL` later.
 
 ---
 

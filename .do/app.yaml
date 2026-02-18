@@ -15,13 +15,17 @@ services:
       branch: main
       deploy_on_push: true
     source_dir: backend
-    build_command: npm install --omit=dev
+    build_command: npm run build
     run_command: node src/server.js
     environment_slug: node-js
     http_port: 8080
     instance_count: 1
     instance_size_slug: basic-xxs
     envs:
+      - key: USE_NPM_INSTALL
+        value: "true"
+        type: GENERAL
+        scope: BUILD_TIME
       - key: PORT
         value: "8080"
         type: GENERAL
@@ -46,12 +50,16 @@ static_sites:
       branch: main
       deploy_on_push: true
     source_dir: admin-panel
-    build_command: npm install && npm run build
+    build_command: npm run build
     output_dir: dist
     environment_slug: node-js
     routes:
       - path: /
     envs:
+      - key: USE_NPM_INSTALL
+        value: "true"
+        type: GENERAL
+        scope: BUILD_TIME
       # Set to your backend URL after first deploy (e.g. https://backend-xxxx.ondigitalocean.app)
       - key: VITE_API_URL
         value: ""

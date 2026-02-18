@@ -5,6 +5,7 @@
   "type": "module",
   "engines": { "node": ">=18.0.0" },
   "scripts": {
+    "build": "echo No build step",
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
     "test": "NODE_ENV=test jest --coverage",
