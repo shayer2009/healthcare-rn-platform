@@ -230,6 +230,31 @@ async function bootstrapDatabase() {
 // Health check moved to routes/health.js
 
 // ---------- Admin APIs (admin panel only) ----------
+// GET /api/admin/login → simple login form (browser visits use GET)
+app.get("/api/admin/login", (_req, res) => {
+  res.type("html").send(`
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Admin Login</title></head>
+<body style="font-family:system-ui;max-width:320px;margin:3rem auto;padding:1.5rem;border:1px solid #ddd;border-radius:8px;">
+  <h2 style="margin-top:0;">Admin Login</h2>
+  <form id="f" method="post" action="/api/admin/login">
+    <p><label>Email <input type="email" name="email" value="admin@healthapp.local" style="width:100%;padding:6px;" required></label></p>
+    <p><label>Password <input type="password" name="password" placeholder="admin123" style="width:100%;padding:6px;" required></label></p>
+    <p><button type="submit" style="padding:8px 16px;">Login</button></p>
+  </form>
+  <p style="font-size:12px;color:#666;">Or POST JSON to this URL: <code>{ "email", "password" }</code></p>
+  <script>
+    document.getElementById("f").onsubmit = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const res = await fetch("/api/admin/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: fd.get("email"), password: fd.get("password") }) });
+      const data = await res.json();
+      if (res.ok) { alert("Logged in! Token: " + data.token.slice(0,20) + "..."); console.log(data); } else { alert(data.message || data.error?.message || "Login failed"); }
+    };
+  </script>
+</body></html>
+  `);
+});
 app.post("/api/admin/login", asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
