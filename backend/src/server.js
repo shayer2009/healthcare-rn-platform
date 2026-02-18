@@ -641,22 +641,30 @@ io.on("connection", (socket) => {
   });
 });
 
-bootstrapDatabase()
-  .then(() => {
-    httpServer.listen(port, () => {
-      logger.info(`Backend running on http://localhost:${port}`);
-      logger.info(`WebSocket server ready`);
-      logger.info(`API Documentation: http://localhost:${port}/api-docs`);
-      logger.info("Seed admin: admin@healthapp.local / admin123");
-      logger.info("Seed doctor: doctor@healthapp.local / doctor123");
-      logger.info("Seed assistant: assistant@healthapp.local / assistant123");
+// Start server first, then bootstrap database (non-blocking)
+httpServer.listen(port, () => {
+  logger.info(`Backend running on http://localhost:${port}`);
+  logger.info(`WebSocket server ready`);
+  logger.info(`API Documentation: http://localhost:${port}/api-docs`);
+  logger.info("Seed admin: admin@healthapp.local / admin123");
+  logger.info("Seed doctor: doctor@healthapp.local / doctor123");
+  logger.info("Seed assistant: assistant@healthapp.local / assistant123");
+  
+  // Bootstrap database in background (non-blocking)
+  bootstrapDatabase()
+    .then(() => {
+      logger.info("Database bootstrap completed successfully");
       startReminderCron();
+    })
+    .catch((error) => {
+      logger.error("Database bootstrap failed (will retry on next request)", { 
+        error: error.message, 
+        stack: error.stack 
+      });
+      // Don't exit - let the app run and retry bootstrap on next DB query
+      // This allows the app to start even if DB isn't ready yet
     });
-  })
-  .catch((error) => {
-    logger.error("Failed to start backend", { error: error.message, stack: error.stack });
-    process.exit(1);
-  });
+});
 
 // Graceful shutdown
 process.on("SIGTERM", () => {
