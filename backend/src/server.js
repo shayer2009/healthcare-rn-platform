@@ -252,7 +252,13 @@ app.get("/api/admin/login", (_req, res) => {
       const fd = new FormData(e.target);
       const res = await fetch("/api/admin/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: fd.get("email"), password: fd.get("password") }) });
       const data = await res.json();
-      if (res.ok) { alert("Logged in! Token: " + data.token.slice(0,20) + "..."); console.log(data); } else { alert(data.message || data.error?.message || "Login failed"); }
+      if (res.ok) {
+        sessionStorage.setItem("admin_token", data.token);
+        sessionStorage.setItem("admin_user", JSON.stringify(data.user || {}));
+        window.location.href = "/admin";
+      } else {
+        alert(data.message || data.error?.message || "Login failed");
+      }
     };
   </script>
 </body></html>
@@ -278,6 +284,78 @@ app.post("/api/admin/login", asyncHandler(async (req, res) => {
     user: { id: admin.id, name: admin.name, email: admin.email }
   });
 }));
+
+// GET /admin → admin dashboard (requires token in sessionStorage; redirects to login if missing)
+app.get("/admin", (_req, res) => {
+  res.type("html").send(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Admin Dashboard</title>
+<style>
+*{box-sizing:border-box}body{font-family:system-ui;margin:0;background:#f5f5f5}
+.adminLayout{display:flex;min-height:100vh}
+.sidebar{width:240px;background:#1a1a2e;color:#fff;padding:1rem}
+.sidebar h2{margin:0 0 1rem;font-size:1rem}
+.sidebar nav{display:flex;flex-direction:column;gap:4px}
+.sidebar a,.sidebar button{background:none;border:none;color:#aaa;text-align:left;padding:8px 12px;cursor:pointer;text-decoration:none;font-size:14px;border-radius:4px}
+.sidebar a:hover,.sidebar button:hover{background:rgba(255,255,255,.1);color:#fff}
+.main{flex:1;padding:1.5rem;overflow:auto}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem}
+.header h1{margin:0;font-size:1.5rem}
+.logout{background:#c00;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:14px}
+.logout:hover{background:#a00}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1rem}
+.card{background:#fff;padding:1.25rem;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.card h3{margin:0 0 8px;font-size:14px;color:#666}
+.card p{margin:0;font-size:1.5rem;font-weight:600}
+.err{color:#c00;padding:1rem}
+</style></head>
+<body>
+<div class="adminLayout" id="app"><div class="err">Loading...</div></div>
+<script>
+(function(){
+  const token = sessionStorage.getItem("admin_token");
+  const user = JSON.parse(sessionStorage.getItem("admin_user") || "{}");
+  if (!token) { window.location.href = "/api/admin/login"; return; }
+
+  function logout(){ sessionStorage.removeItem("admin_token"); sessionStorage.removeItem("admin_user"); window.location.href = "/api/admin/login"; }
+
+  async function api(path){ const r = await fetch(path, { headers: { Authorization: "Bearer " + token } }); return r.json(); }
+
+  const dash = await api("/api/admin/dashboard").catch(e => ({}));
+  const cards = dash.cards || {};
+  const settings = dash.settings || {};
+
+  document.getElementById("app").innerHTML = \`
+    <aside class="sidebar">
+      <h2>World Health Portal</h2>
+      <nav>
+        <a href="/admin">Dashboard</a>
+        <a href="/api-docs" target="_blank">API Docs</a>
+        <a href="/">API Home</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <div class="header">
+        <h1>Admin Dashboard</h1>
+        <div>
+          <span style="margin-right:1rem;color:#666">\${user.name || "Admin"}</span>
+          <button class="logout" onclick="(function(){sessionStorage.clear();location.href='/api/admin/login'})()">Logout</button>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="card"><h3>Total Doctors</h3><p>\${cards.totalDoctors ?? 0}</p></div>
+        <div class="card"><h3>Total Patients</h3><p>\${cards.totalPatients ?? 0}</p></div>
+        <div class="card"><h3>Total Queries</h3><p>\${cards.totalQueries ?? 0}</p></div>
+      </div>
+      <div class="card" style="margin-top:1.5rem">
+        <h3>Enterprise Settings</h3>
+        <p style="font-size:14px">\${Object.keys(settings).length} settings configured</p>
+      </div>
+    </main>
+  \`;
+})();
+</script>
+</body></html>`);
+});
 
 app.get("/api/admin/dashboard", authMiddleware, requireAdmin, asyncHandler(async (_req, res) => {
   const totalDoctors = 125;
