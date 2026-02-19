@@ -49,7 +49,17 @@ app.io = io; // Attach io to app for routes
 const port = Number(process.env.PORT || 4000);
 const jwtSecret = process.env.JWT_SECRET || "change_this_secret";
 
-app.use(helmet()); // Security headers
+// Configure Helmet to allow inline scripts for admin pages (login form and dashboard)
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"], // Allow inline scripts for admin pages
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+}));
 app.use(compression()); // Gzip compression
 app.use(cors());
 app.use(express.json());
@@ -289,7 +299,8 @@ app.post("/api/admin/login", asyncHandler(async (req, res) => {
   }
 
   const hash = "t=" + encodeURIComponent(token) + "&u=" + encodeURIComponent(JSON.stringify(user));
-  res.redirect(302, "/admin#" + hash);
+  res.set("Cache-Control", "no-store");
+  res.type("html").send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Redirecting...</title></head><body style="font-family:system-ui;text-align:center;padding:3rem;"><p>Login successful. Redirecting...</p><script>sessionStorage.setItem("admin_token", ${JSON.stringify(token)});sessionStorage.setItem("admin_user", ${JSON.stringify(JSON.stringify(user))});window.location.href="/admin#${hash.replace(/"/g, "&quot;")}";</script><noscript><meta http-equiv="refresh" content="0;url=/admin#${hash.replace(/"/g, "&quot;")}"></noscript></body></html>`);
 }));
 
 // GET /admin → admin dashboard (token from sessionStorage or from URL hash)
@@ -319,6 +330,7 @@ app.get("/admin", (_req, res) => {
 <body>
 <div class="adminLayout" id="app"><div class="err">Loading...</div></div>
 <script>
+try {
 (function(){
   var token = sessionStorage.getItem("admin_token");
   var user = {};
@@ -337,6 +349,11 @@ app.get("/admin", (_req, res) => {
   }
   if (!token) { window.location.href = "/api/admin/login"; return; }
 
+  function updateStatus(msg){
+    var app = document.getElementById("app");
+    app.innerHTML = "<div class=\"err\">" + msg + "</div>";
+  }
+
   function showErr(txt){
     var app = document.getElementById("app");
     app.innerHTML = "<div class=\"err\"><p>" + txt + "</p><p><a href=\"/api/admin/login\">Back to Login</a></p></div>";
@@ -345,11 +362,32 @@ app.get("/admin", (_req, res) => {
     var ctrl = new AbortController();
     var t = setTimeout(function(){ ctrl.abort(); }, 15000);
     return fetch(path, { headers: { Authorization: "Bearer " + token }, signal: ctrl.signal })
-      .then(function(r){ clearTimeout(t); return r.json().catch(function(){ return {}; }); })
+      .then(function(r){
+        clearTimeout(t);
+        if (r.status === 401) {
+          sessionStorage.removeItem("admin_token");
+          sessionStorage.removeItem("admin_user");
+          window.location.href = "/api/admin/login";
+          return Promise.reject(new Error("Unauthorized"));
+        }
+        if (!r.ok) {
+          return r.text().then(function(text){
+            try { var err = JSON.parse(text); throw new Error(err.message || "HTTP " + r.status); } catch(e){
+              if (e.message) throw e;
+              throw new Error("HTTP " + r.status + ": " + text.substring(0, 100));
+            }
+          });
+        }
+        return r.json().catch(function(){ return {}; });
+      })
       .catch(function(e){ clearTimeout(t); throw e; });
   }
 
+  updateStatus("Loading dashboard...");
   api("/api/admin/dashboard").then(function(dash){
+    if (!dash || typeof dash !== "object") {
+      throw new Error("Invalid dashboard response");
+    }
     var cards = (dash && dash.cards) ? dash.cards : {};
     var settings = (dash && dash.settings) ? dash.settings : {};
     var userName = (user && user.name) ? user.name : "Admin";
@@ -367,9 +405,15 @@ app.get("/admin", (_req, res) => {
       (settings ? Object.keys(settings).length : 0) + " settings configured</p></div></main>";
     document.getElementById("app").innerHTML = html;
   }).catch(function(e){
-    showErr("Could not load dashboard: " + (e.message || "Network error") + ". Try <a href=\\"/api/admin/login\\">logging in again</a>.");
+    var msg = e.message || "Network error";
+    console.error("Dashboard error:", e);
+    showErr("Could not load dashboard: " + msg + ". <a href=\\"/api/admin/login\\">Log in again</a>.");
   });
 })();
+} catch(e) {
+  document.getElementById("app").innerHTML = "<div class=\\"err\\"><p>Error: " + (e.message || "Unknown error") + "</p><p><a href=\\"/api/admin/login\\">Back to Login</a></p></div>";
+  console.error("Admin page error:", e);
+}
 </script>
 </body></html>`);
 });
