@@ -235,6 +235,7 @@ async function bootstrapDatabase() {
 // ---------- Admin APIs (admin panel only) ----------
 // GET /api/admin/login → simple login form (browser visits use GET)
 app.get("/api/admin/login", (_req, res) => {
+  res.set("Cache-Control", "no-store");
   res.type("html").send(`
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Admin Login</title></head>
@@ -268,7 +269,8 @@ app.get("/api/admin/login", (_req, res) => {
           if (res.ok) {
             sessionStorage.setItem("admin_token", data.token);
             sessionStorage.setItem("admin_user", JSON.stringify(data.user || {}));
-            window.location.href = "/admin";
+            var q = "t=" + encodeURIComponent(data.token) + "&u=" + encodeURIComponent(JSON.stringify(data.user || {}));
+            window.location.href = "/admin#" + q;
           } else {
             msg.textContent = data.message || (data.error && data.error.message) || "Login failed";
           }
@@ -302,8 +304,9 @@ app.post("/api/admin/login", asyncHandler(async (req, res) => {
   });
 }));
 
-// GET /admin → admin dashboard (requires token in sessionStorage; redirects to login if missing)
+// GET /admin → admin dashboard (token from sessionStorage or from URL hash)
 app.get("/admin", (_req, res) => {
+  res.set("Cache-Control", "no-store");
   res.type("html").send(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Admin Dashboard</title>
 <style>
@@ -332,6 +335,18 @@ app.get("/admin", (_req, res) => {
   var token = sessionStorage.getItem("admin_token");
   var user = {};
   try { user = JSON.parse(sessionStorage.getItem("admin_user") || "{}"); } catch(e){}
+  var hash = window.location.hash.slice(1);
+  if (hash) {
+    var params = new URLSearchParams(hash);
+    var t = params.get("t");
+    var u = params.get("u");
+    if (t) {
+      token = decodeURIComponent(t);
+      sessionStorage.setItem("admin_token", token);
+      if (u) try { user = JSON.parse(decodeURIComponent(u)); sessionStorage.setItem("admin_user", JSON.stringify(user)); } catch(e){}
+      history.replaceState(null, "", "/admin");
+    }
+  }
   if (!token) { window.location.href = "/api/admin/login"; return; }
 
   function showErr(txt){
@@ -350,35 +365,19 @@ app.get("/admin", (_req, res) => {
     var cards = (dash && dash.cards) ? dash.cards : {};
     var settings = (dash && dash.settings) ? dash.settings : {};
     var userName = (user && user.name) ? user.name : "Admin";
-
-    document.getElementById("app").innerHTML = \`
-    <aside class="sidebar">
-      <h2>World Health Portal</h2>
-      <nav>
-        <a href="/admin">Dashboard</a>
-        <a href="/api-docs" target="_blank">API Docs</a>
-        <a href="/">API Home</a>
-      </nav>
-    </aside>
-    <main class="main">
-      <div class="header">
-        <h1>Admin Dashboard</h1>
-        <div>
-          <span style="margin-right:1rem;color:#666">\${"userName"}</span>
-          <button class="logout" onclick="(function(){sessionStorage.clear();location.href='/api/admin/login'})()">Logout</button>
-        </div>
-      </div>
-      <div class="grid">
-        <div class="card"><h3>Total Doctors</h3><p>\${"(cards.totalDoctors != null) ? cards.totalDoctors : 0}"}</p></div>
-        <div class="card"><h3>Total Patients</h3><p>\${"(cards.totalPatients != null) ? cards.totalPatients : 0}"}</p></div>
-        <div class="card"><h3>Total Queries</h3><p>\${"(cards.totalQueries != null) ? cards.totalQueries : 0}"}</p></div>
-      </div>
-      <div class="card" style="margin-top:1.5rem">
-        <h3>Enterprise Settings</h3>
-        <p style="font-size:14px">\${"Object.keys(settings).length"} settings configured</p>
-      </div>
-    </main>
-  \`;
+    var n = function(v){ return (v != null) ? v : 0; };
+    var html = "<aside class=\\"sidebar\\"><h2>World Health Portal</h2><nav>" +
+      "<a href=\\"/admin\\">Dashboard</a><a href=\\"/api-docs\\" target=\\"_blank\\">API Docs</a><a href=\\"/\\">API Home</a>" +
+      "</nav></aside><main class=\\"main\\"><div class=\\"header\\"><h1>Admin Dashboard</h1><div>" +
+      "<span style=\\"margin-right:1rem;color:#666\\">" + userName + "</span>" +
+      "<button class=\\"logout\\" onclick=\\"sessionStorage.clear();location.href='/api/admin/login'\\">Logout</button>" +
+      "</div></div><div class=\\"grid\\">" +
+      "<div class=\\"card\\"><h3>Total Doctors</h3><p>" + n(cards.totalDoctors) + "</p></div>" +
+      "<div class=\\"card\\"><h3>Total Patients</h3><p>" + n(cards.totalPatients) + "</p></div>" +
+      "<div class=\\"card\\"><h3>Total Queries</h3><p>" + n(cards.totalQueries) + "</p></div>" +
+      "</div><div class=\\"card\\" style=\\"margin-top:1.5rem\\"><h3>Enterprise Settings</h3><p style=\\"font-size:14px\\">" +
+      (settings ? Object.keys(settings).length : 0) + " settings configured</p></div></main>";
+    document.getElementById("app").innerHTML = html;
   }).catch(function(e){
     showErr("Could not load dashboard: " + (e.message || "Network error") + ". Try <a href=\\"/api/admin/login\\">logging in again</a>.");
   });
