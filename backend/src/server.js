@@ -328,6 +328,7 @@ app.get("/admin", (_req, res) => {
 ".card h3{margin:0 0 8px;font-size:14px;color:#666}" +
 ".card p{margin:0;font-size:1.5rem;font-weight:600}" +
 ".err{color:#c00;padding:1rem}" +
+"input[type=checkbox]{accent-color:#1a1a2e}" +
 "</style></head>" +
 "<body>" +
 "<div class=\"adminLayout\" id=\"app\"><div class=\"err\">Loading...</div></div>" +
@@ -358,10 +359,14 @@ app.get("/admin", (_req, res) => {
 "    var app = document.getElementById(\"app\");" +
 "    app.innerHTML = \"<div class=\\\"err\\\"><p>\" + txt + \"</p><p><a href=\\\"/api/admin/login\\\">Back to Login</a></p></div>\";" +
 "  }" +
-"  function api(path){" +
+"  function api(path, opts){" +
+"    opts = opts || {};" +
 "    var ctrl = new AbortController();" +
 "    var t = setTimeout(function(){ ctrl.abort(); }, 15000);" +
-"    return fetch(path, { headers: { Authorization: \"Bearer \" + token }, signal: ctrl.signal })" +
+"    var fetchOpts = { headers: { Authorization: \"Bearer \" + token, \"Content-Type\": \"application/json\" }, signal: ctrl.signal };" +
+"    if (opts.method) fetchOpts.method = opts.method;" +
+"    if (opts.body) fetchOpts.body = opts.body;" +
+"    return fetch(path, fetchOpts)" +
 "      .then(function(r){" +
 "        clearTimeout(t);" +
 "        if (r.status === 401) {" +
@@ -386,26 +391,59 @@ app.get("/admin", (_req, res) => {
 "      .catch(function(e){ clearTimeout(t); throw e; });" +
 "  }" +
 "  updateStatus(\"Loading dashboard...\");" +
-"  api(\"/api/admin/dashboard\").then(function(dash){" +
-"    if (!dash || typeof dash !== \"object\") {" +
-"      throw new Error(\"Invalid dashboard response\");" +
-"    }" +
+"  Promise.all([" +
+"    api(\"/api/admin/dashboard\").catch(function(){ return {}; })," +
+"    api(\"/api/admin/analytics\").catch(function(){ return {}; })," +
+"    api(\"/api/admin/enterprise-settings\").catch(function(){ return {}; })," +
+"    api(\"/api/system/status\").catch(function(){ return {}; })" +
+"  ]).then(function(results){" +
+"    var dash = results[0] || {};" +
+"    var analytics = results[1] || {};" +
+"    var entSettings = results[2] || {};" +
+"    var sysStatus = results[3] || {};" +
 "    var cards = (dash && dash.cards) ? dash.cards : {};" +
 "    var settings = (dash && dash.settings) ? dash.settings : {};" +
+"    var entSet = (entSettings && entSettings.settings) ? entSettings.settings : {};" +
 "    var userName = (user && user.name) ? user.name : \"Admin\";" +
 "    var n = function(v){ return (v != null) ? v : 0; };" +
-"    var html = \"<aside class=\\\"sidebar\\\"><h2>World Health Portal</h2><nav>\" +" +
-"      \"<a href=\\\"/admin\\\">Dashboard</a><a href=\\\"/api-docs\\\" target=\\\"_blank\\\">API Docs</a><a href=\\\"/\\\">API Home</a>\" +" +
-"      \"</nav></aside><main class=\\\"main\\\"><div class=\\\"header\\\"><h1>Admin Dashboard</h1><div>\" +" +
+"    var fmt = function(v){ return typeof v === \"number\" ? v.toLocaleString() : String(v); };" +
+"    var sidebar = \"<aside class=\\\"sidebar\\\"><h2>World Health Portal</h2><nav>\" +" +
+"      \"<a href=\\\"/admin\\\">📊 Dashboard</a>\" +" +
+"      \"<a href=\\\"/api-docs\\\" target=\\\"_blank\\\">📚 API Docs</a>\" +" +
+"      \"<a href=\\\"/\\\">🏠 API Home</a>\" +" +
+"      \"<a href=\\\"#\\\" onclick=\\\"loadSection('settings');return false;\\\">⚙️ Settings</a>\" +" +
+"      \"<a href=\\\"#\\\" onclick=\\\"loadSection('analytics');return false;\\\">📈 Analytics</a>\" +" +
+"      \"</nav></aside>\";" +
+"    var header = \"<div class=\\\"header\\\"><h1>Admin Dashboard</h1><div>\" +" +
 "      \"<span style=\\\"margin-right:1rem;color:#666\\\">\" + userName + \"</span>\" +" +
 "      \"<button class=\\\"logout\\\" onclick=\\\"sessionStorage.clear();location.href='/api/admin/login'\\\">Logout</button>\" +" +
-"      \"</div></div><div class=\\\"grid\\\">\" +" +
-"      \"<div class=\\\"card\\\"><h3>Total Doctors</h3><p>\" + n(cards.totalDoctors) + \"</p></div>\" +" +
-"      \"<div class=\\\"card\\\"><h3>Total Patients</h3><p>\" + n(cards.totalPatients) + \"</p></div>\" +" +
-"      \"<div class=\\\"card\\\"><h3>Total Queries</h3><p>\" + n(cards.totalQueries) + \"</p></div>\" +" +
-"      \"</div><div class=\\\"card\\\" style=\\\"margin-top:1.5rem\\\"><h3>Enterprise Settings</h3><p style=\\\"font-size:14px\\\">\" +" +
-"      (settings ? Object.keys(settings).length : 0) + \" settings configured</p></div></main>\";" +
+"      \"</div></div>\";" +
+"    var statsCards = \"<div class=\\\"grid\\\">\" +" +
+"      \"<div class=\\\"card\\\"><h3>Total Doctors</h3><p>\" + fmt(n(analytics.totalDoctors || cards.totalDoctors)) + \"</p></div>\" +" +
+"      \"<div class=\\\"card\\\"><h3>Total Patients</h3><p>\" + fmt(n(analytics.totalPatients || cards.totalPatients)) + \"</p></div>\" +" +
+"      \"<div class=\\\"card\\\"><h3>Consultations</h3><p>\" + fmt(n(analytics.completedConsultations)) + \"</p></div>\" +" +
+"      \"<div class=\\\"card\\\"><h3>Revenue</h3><p>$\" + fmt(n(analytics.totalRevenue)) + \"</p></div>\" +" +
+"      \"</div>\";" +
+"    var sysCard = \"<div class=\\\"card\\\" style=\\\"margin-top:1.5rem\\\"><h3>System Status</h3><p style=\\\"font-size:14px;color:\" + (sysStatus.status === \"healthy\" ? \"#0a0\" : \"#c00\") + \"\\\">\" + (sysStatus.status || \"Unknown\") + \" - Database: \" + (sysStatus.db || \"Unknown\") + \"</p></div>\";" +
+"    var settingsHtml = \"<div class=\\\"card\\\" style=\\\"margin-top:1.5rem\\\" id=\\\"settingsPanel\\\"><h3>Enterprise Settings</h3>\" +" +
+"      \"<div style=\\\"display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem;margin-top:1rem\\\">\";" +
+"    var settingKeys = [\"video_enabled\",\"scheduling_enabled\",\"mfa_enabled\",\"ehr_enabled\",\"eprescribing_enabled\",\"payments_enabled\",\"notifications_enabled\",\"analytics_enabled\",\"integrations_enabled\",\"audit_logging_enabled\",\"multitenancy_enabled\"];" +
+"    var settingLabels = {video_enabled:\"Video\",scheduling_enabled:\"Scheduling\",mfa_enabled:\"MFA\",ehr_enabled:\"EHR\",eprescribing_enabled:\"E-Prescribing\",payments_enabled:\"Payments\",notifications_enabled:\"Notifications\",analytics_enabled:\"Analytics\",integrations_enabled:\"Integrations\",audit_logging_enabled:\"Audit Logging\",multitenancy_enabled:\"Multi-Tenancy\"};" +
+"    for (var i = 0; i < settingKeys.length; i++) {" +
+"      var key = settingKeys[i];" +
+"      var val = entSet[key] || false;" +
+"      settingsHtml += \"<label style=\\\"display:flex;align-items:center;gap:8px;cursor:pointer;\\\"><input type=\\\"checkbox\\\" \" + (val ? \"checked\" : \"\") + \" onchange=\\\"toggleSetting('\" + key + \"',this.checked)\\\" style=\\\"width:18px;height:18px;cursor:pointer;\\\"><span>\" + (settingLabels[key] || key) + \"</span></label>\";" +
+"    }" +
+"    settingsHtml += \"</div></div>\";" +
+"    var mainContent = header + statsCards + sysCard + settingsHtml;" +
+"    var html = sidebar + \"<main class=\\\"main\\\">\" + mainContent + \"</main>\";" +
 "    document.getElementById(\"app\").innerHTML = html;" +
+"    window.toggleSetting = function(key, enabled){" +
+"      api(\"/api/admin/enterprise-settings/\" + key, {method:\"PUT\",body:JSON.stringify({enabled:enabled})}).then(function(){" +
+"        updateStatus(\"Setting updated\");" +
+"        setTimeout(function(){ location.reload(); }, 500);" +
+"      }).catch(function(e){ alert(\"Failed to update: \" + (e.message || \"Error\")); });" +
+"    };" +
 "  }).catch(function(e){" +
 "    var msg = e.message || \"Network error\";" +
 "    console.error(\"Dashboard error:\", e);" +
