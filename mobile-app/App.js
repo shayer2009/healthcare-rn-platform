@@ -20,7 +20,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 const Drawer = createDrawerNavigator();
 const PURPLE = "#5d3ea8";
 const BG = "#f6f6f8";
-const API_URL = Platform.OS === "android" ? "http://10.0.2.2:4000" : "http://localhost:4000";
+const API_URL = "https://world-health-portal-gpeip.ondigitalocean.app";
 
 async function apiRequest(path, options = {}) {
   const response = await fetch(`${API_URL}${path}`, options);
