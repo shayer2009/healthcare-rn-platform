@@ -1,12 +1,34 @@
 {
   "expo": {
-    "name": "Healthcare UI",
-    "slug": "healthcare-ui",
+    "name": "World Health Portal",
+    "slug": "world-health-portal",
     "version": "1.0.0",
     "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#5d3ea8",
+      "resizeMode": "contain"
+    },
     "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.worldhealthportal.app"
+    },
     "android": {
-      "package": "com.example.healthcareui"
+      "package": "com.worldhealthportal.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#5d3ea8"
+      },
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
+    },
+    "extra": {
+      "eas": {
+        "projectId": "your-project-id-here"
+      }
     }
   }
 }
