@@ -251,24 +251,31 @@ app.get("/api/admin/login", (_req, res) => {
       var f = document.getElementById("f");
       var btn = document.getElementById("btn");
       var msg = document.getElementById("msg");
+      var emailEl = document.getElementById("email");
+      var passwordEl = document.getElementById("password");
+      var params = new URLSearchParams(window.location.search);
+      if (params.get("email")) emailEl.value = params.get("email");
+      if (params.get("password")) passwordEl.value = params.get("password");
       f.onsubmit = function(e){ e.preventDefault(); e.stopPropagation(); return false; };
-      btn.onclick = function(){
+      function doLogin(){
         msg.textContent = "";
         btn.disabled = true;
         fetch("/api/admin/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: document.getElementById("email").value, password: document.getElementById("password").value })
+          body: JSON.stringify({ email: emailEl.value, password: passwordEl.value })
         }).then(function(res){ return res.json().then(function(data){
           if (res.ok) {
             sessionStorage.setItem("admin_token", data.token);
             sessionStorage.setItem("admin_user", JSON.stringify(data.user || {}));
             window.location.href = "/admin";
           } else {
-            msg.textContent = data.message || data.error?.message || "Login failed";
+            msg.textContent = data.message || (data.error && data.error.message) || "Login failed";
           }
         }); }).catch(function(err){ msg.textContent = "Network error"; }).finally(function(){ btn.disabled = false; });
-      };
+      }
+      btn.onclick = doLogin;
+      if (params.get("email") && params.get("password")) doLogin();
     })();
   </script>
 </body></html>
@@ -322,19 +329,29 @@ app.get("/admin", (_req, res) => {
 <div class="adminLayout" id="app"><div class="err">Loading...</div></div>
 <script>
 (function(){
-  const token = sessionStorage.getItem("admin_token");
-  const user = JSON.parse(sessionStorage.getItem("admin_user") || "{}");
+  var token = sessionStorage.getItem("admin_token");
+  var user = {};
+  try { user = JSON.parse(sessionStorage.getItem("admin_user") || "{}"); } catch(e){}
   if (!token) { window.location.href = "/api/admin/login"; return; }
 
-  function logout(){ sessionStorage.removeItem("admin_token"); sessionStorage.removeItem("admin_user"); window.location.href = "/api/admin/login"; }
+  function showErr(txt){
+    var app = document.getElementById("app");
+    app.innerHTML = "<div class=\"err\"><p>" + txt + "</p><p><a href=\"/api/admin/login\">Back to Login</a></p></div>";
+  }
+  function api(path){
+    var ctrl = new AbortController();
+    var t = setTimeout(function(){ ctrl.abort(); }, 15000);
+    return fetch(path, { headers: { Authorization: "Bearer " + token }, signal: ctrl.signal })
+      .then(function(r){ clearTimeout(t); return r.json().catch(function(){ return {}; }); })
+      .catch(function(e){ clearTimeout(t); throw e; });
+  }
 
-  async function api(path){ const r = await fetch(path, { headers: { Authorization: "Bearer " + token } }); return r.json(); }
+  api("/api/admin/dashboard").then(function(dash){
+    var cards = (dash && dash.cards) ? dash.cards : {};
+    var settings = (dash && dash.settings) ? dash.settings : {};
+    var userName = (user && user.name) ? user.name : "Admin";
 
-  const dash = await api("/api/admin/dashboard").catch(e => ({}));
-  const cards = dash.cards || {};
-  const settings = dash.settings || {};
-
-  document.getElementById("app").innerHTML = \`
+    document.getElementById("app").innerHTML = \`
     <aside class="sidebar">
       <h2>World Health Portal</h2>
       <nav>
@@ -347,21 +364,24 @@ app.get("/admin", (_req, res) => {
       <div class="header">
         <h1>Admin Dashboard</h1>
         <div>
-          <span style="margin-right:1rem;color:#666">\${user.name || "Admin"}</span>
+          <span style="margin-right:1rem;color:#666">\${"userName"}</span>
           <button class="logout" onclick="(function(){sessionStorage.clear();location.href='/api/admin/login'})()">Logout</button>
         </div>
       </div>
       <div class="grid">
-        <div class="card"><h3>Total Doctors</h3><p>\${cards.totalDoctors ?? 0}</p></div>
-        <div class="card"><h3>Total Patients</h3><p>\${cards.totalPatients ?? 0}</p></div>
-        <div class="card"><h3>Total Queries</h3><p>\${cards.totalQueries ?? 0}</p></div>
+        <div class="card"><h3>Total Doctors</h3><p>\${"(cards.totalDoctors != null) ? cards.totalDoctors : 0}"}</p></div>
+        <div class="card"><h3>Total Patients</h3><p>\${"(cards.totalPatients != null) ? cards.totalPatients : 0}"}</p></div>
+        <div class="card"><h3>Total Queries</h3><p>\${"(cards.totalQueries != null) ? cards.totalQueries : 0}"}</p></div>
       </div>
       <div class="card" style="margin-top:1.5rem">
         <h3>Enterprise Settings</h3>
-        <p style="font-size:14px">\${Object.keys(settings).length} settings configured</p>
+        <p style="font-size:14px">\${"Object.keys(settings).length"} settings configured</p>
       </div>
     </main>
   \`;
+  }).catch(function(e){
+    showErr("Could not load dashboard: " + (e.message || "Network error") + ". Try <a href=\\"/api/admin/login\\">logging in again</a>.");
+  });
 })();
 </script>
 </body></html>`);
