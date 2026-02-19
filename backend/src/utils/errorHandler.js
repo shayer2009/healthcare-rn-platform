@@ -61,6 +61,10 @@ export function asyncHandler(fn) {
 }
 
 export function notFoundHandler(req, res, next) {
+  // Redirect /api/admin and /api/admin/ to login (so it works even if route order differs)
+  if (req.method === "GET" && (req.path === "/api/admin" || req.path === "/api/admin/")) {
+    return res.redirect(302, "/api/admin/login");
+  }
   const error = new AppError(`Route ${req.path} not found`, 404);
   next(error);
 }

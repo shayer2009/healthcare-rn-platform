@@ -64,6 +64,9 @@ app.use("/api/patient/login", authRateLimiter);
 app.use("/api/doctor/login", authRateLimiter);
 app.use("/api/assistant/login", authRateLimiter);
 
+// Redirect /api/admin and /api/admin/ to login (early so always hit)
+app.get(["/api/admin", "/api/admin/"], (_req, res) => res.redirect(302, "/api/admin/login"));
+
 function createToken(payload) {
   return jwt.sign(payload, jwtSecret, { expiresIn: "12h" });
 }
