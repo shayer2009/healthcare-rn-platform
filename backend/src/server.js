@@ -233,75 +233,63 @@ async function bootstrapDatabase() {
 // Health check moved to routes/health.js
 
 // ---------- Admin APIs (admin panel only) ----------
-// GET /api/admin/login → simple login form (browser visits use GET)
-app.get("/api/admin/login", (_req, res) => {
+// GET /api/admin/login → simple login form (plain form POST, no JS required)
+app.get("/api/admin/login", (req, res) => {
   res.set("Cache-Control", "no-store");
+  const email = (req.query.email != null) ? String(req.query.email) : "admin@healthapp.local";
+  const password = (req.query.password != null) ? String(req.query.password) : "";
   res.type("html").send(`
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Admin Login</title></head>
 <body style="font-family:system-ui;max-width:320px;margin:3rem auto;padding:1.5rem;border:1px solid #ddd;border-radius:8px;">
   <h2 style="margin-top:0;">Admin Login</h2>
-  <form id="f" onsubmit="return false;">
-    <p><label>Email <input type="email" id="email" name="email" value="admin@healthapp.local" style="width:100%;padding:6px;" required></label></p>
-    <p><label>Password <input type="password" id="password" name="password" placeholder="admin123" style="width:100%;padding:6px;" required></label></p>
-    <p><button type="submit" id="btn" style="padding:8px 16px;">Login</button></p>
+  <form method="post" action="/api/admin/login">
+    <p><label>Email <input type="email" name="email" value="${email.replace(/"/g, "&quot;")}" style="width:100%;padding:6px;" required></label></p>
+    <p><label>Password <input type="password" name="password" value="${password.replace(/"/g, "&quot;")}" placeholder="admin123" style="width:100%;padding:6px;" ${password ? "" : "required"}></label></p>
+    <p><button type="submit" style="padding:8px 16px;">Login</button></p>
   </form>
-  <p id="msg" style="font-size:14px;color:#c00;"></p>
-  <script>
-    (function(){
-      var f = document.getElementById("f");
-      var btn = document.getElementById("btn");
-      var msg = document.getElementById("msg");
-      var emailEl = document.getElementById("email");
-      var passwordEl = document.getElementById("password");
-      var params = new URLSearchParams(window.location.search);
-      if (params.get("email")) emailEl.value = params.get("email");
-      if (params.get("password")) passwordEl.value = params.get("password");
-      f.onsubmit = function(e){ e.preventDefault(); e.stopPropagation(); return false; };
-      function doLogin(){
-        msg.textContent = "";
-        btn.disabled = true;
-        fetch("/api/admin/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: emailEl.value, password: passwordEl.value })
-        }).then(function(res){ return res.json().then(function(data){
-          if (res.ok) {
-            sessionStorage.setItem("admin_token", data.token);
-            sessionStorage.setItem("admin_user", JSON.stringify(data.user || {}));
-            var q = "t=" + encodeURIComponent(data.token) + "&u=" + encodeURIComponent(JSON.stringify(data.user || {}));
-            window.location.href = "/admin#" + q;
-          } else {
-            msg.textContent = data.message || (data.error && data.error.message) || "Login failed";
-          }
-        }); }).catch(function(err){ msg.textContent = "Network error"; }).finally(function(){ btn.disabled = false; });
-      }
-      btn.onclick = doLogin;
-      if (params.get("email") && params.get("password")) doLogin();
-    })();
-  </script>
+  <p style="font-size:12px;color:#666;">Default: admin@healthapp.local / admin123</p>
 </body></html>
   `);
 });
+
+// POST /api/admin/login → JSON for API clients, redirect for browser form submit
 app.post("/api/admin/login", asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+  const email = req.body.email != null ? String(req.body.email).trim() : "";
+  const password = req.body.password != null ? String(req.body.password) : "";
+  const wantsJson = req.is("json") || (req.get("content-type") || "").includes("application/json");
+
+  const sendJson = (status, data) => {
+    if (wantsJson) return res.status(status).json(data);
+    res.set("Cache-Control", "no-store");
+    res.status(status).type("html").send(
+      `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Login</title></head><body style="font-family:system-ui;margin:2rem;max-width:400px;"><p style="color:#c00;">${(data.message || data.error?.message || "Login failed").replace(/</g, "&lt;")}</p><p><a href="/api/admin/login">Back to login</a></p></body></html>`
+    );
+  };
+
   if (!email || !password) {
-    return res.status(400).json({ message: "Email and password are required" });
+    return wantsJson ? res.status(400).json({ message: "Email and password are required" }) : sendJson(400, { message: "Email and password are required" });
   }
+
   const users = await query("SELECT * FROM admins WHERE email = ?", [email]);
   if (users.length === 0) {
-    return res.status(401).json({ message: "Invalid credentials" });
+    return sendJson(401, { message: "Invalid credentials" });
   }
   const admin = users[0];
   const isValid = await bcrypt.compare(password, admin.password_hash);
   if (!isValid) {
-    return res.status(401).json({ message: "Invalid credentials" });
+    return sendJson(401, { message: "Invalid credentials" });
   }
+
   const token = createToken({ sub: admin.id, role: "admin", name: admin.name });
-  return res.json({
-    token,
-    user: { id: admin.id, name: admin.name, email: admin.email }
-  });
+  const user = { id: admin.id, name: admin.name, email: admin.email };
+
+  if (wantsJson) {
+    return res.json({ token, user });
+  }
+
+  const hash = "t=" + encodeURIComponent(token) + "&u=" + encodeURIComponent(JSON.stringify(user));
+  res.redirect(302, "/admin#" + hash);
 }));
 
 // GET /admin → admin dashboard (token from sessionStorage or from URL hash)
