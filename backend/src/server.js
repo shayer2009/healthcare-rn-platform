@@ -240,26 +240,36 @@ app.get("/api/admin/login", (_req, res) => {
 <html><head><meta charset="utf-8"><title>Admin Login</title></head>
 <body style="font-family:system-ui;max-width:320px;margin:3rem auto;padding:1.5rem;border:1px solid #ddd;border-radius:8px;">
   <h2 style="margin-top:0;">Admin Login</h2>
-  <form id="f" method="post" action="/api/admin/login">
-    <p><label>Email <input type="email" name="email" value="admin@healthapp.local" style="width:100%;padding:6px;" required></label></p>
-    <p><label>Password <input type="password" name="password" placeholder="admin123" style="width:100%;padding:6px;" required></label></p>
-    <p><button type="submit" style="padding:8px 16px;">Login</button></p>
+  <form id="f" onsubmit="return false;">
+    <p><label>Email <input type="email" id="email" name="email" value="admin@healthapp.local" style="width:100%;padding:6px;" required></label></p>
+    <p><label>Password <input type="password" id="password" name="password" placeholder="admin123" style="width:100%;padding:6px;" required></label></p>
+    <p><button type="submit" id="btn" style="padding:8px 16px;">Login</button></p>
   </form>
-  <p style="font-size:12px;color:#666;">Or POST JSON to this URL: <code>{ "email", "password" }</code></p>
+  <p id="msg" style="font-size:14px;color:#c00;"></p>
   <script>
-    document.getElementById("f").onsubmit = async (e) => {
-      e.preventDefault();
-      const fd = new FormData(e.target);
-      const res = await fetch("/api/admin/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: fd.get("email"), password: fd.get("password") }) });
-      const data = await res.json();
-      if (res.ok) {
-        sessionStorage.setItem("admin_token", data.token);
-        sessionStorage.setItem("admin_user", JSON.stringify(data.user || {}));
-        window.location.href = "/admin";
-      } else {
-        alert(data.message || data.error?.message || "Login failed");
-      }
-    };
+    (function(){
+      var f = document.getElementById("f");
+      var btn = document.getElementById("btn");
+      var msg = document.getElementById("msg");
+      f.onsubmit = function(e){ e.preventDefault(); e.stopPropagation(); return false; };
+      btn.onclick = function(){
+        msg.textContent = "";
+        btn.disabled = true;
+        fetch("/api/admin/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: document.getElementById("email").value, password: document.getElementById("password").value })
+        }).then(function(res){ return res.json().then(function(data){
+          if (res.ok) {
+            sessionStorage.setItem("admin_token", data.token);
+            sessionStorage.setItem("admin_user", JSON.stringify(data.user || {}));
+            window.location.href = "/admin";
+          } else {
+            msg.textContent = data.message || data.error?.message || "Login failed";
+          }
+        }); }).catch(function(err){ msg.textContent = "Network error"; }).finally(function(){ btn.disabled = false; });
+      };
+    })();
   </script>
 </body></html>
   `);
