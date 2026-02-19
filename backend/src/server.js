@@ -411,8 +411,6 @@ app.get("/admin", (_req, res) => {
 "      \"<a href=\\\"/admin\\\">📊 Dashboard</a>\" +" +
 "      \"<a href=\\\"/api-docs\\\" target=\\\"_blank\\\">📚 API Docs</a>\" +" +
 "      \"<a href=\\\"/\\\">🏠 API Home</a>\" +" +
-"      \"<a href=\\\"#\\\" onclick=\\\"loadSection('settings');return false;\\\">⚙️ Settings</a>\" +" +
-"      \"<a href=\\\"#\\\" onclick=\\\"loadSection('analytics');return false;\\\">📈 Analytics</a>\" +" +
 "      \"</nav></aside>\";" +
 "    var header = \"<div class=\\\"header\\\"><h1>Admin Dashboard</h1><div>\" +" +
 "      \"<span style=\\\"margin-right:1rem;color:#666\\\">\" + userName + \"</span>\" +" +
